@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Rust ASCII</title>
+  </head>
+  <body>
+    <h1>Rust ASCII-maker </h1>
+    <div>
+      <h2> Updated page handling </h2>
+      <div>
+        <label for="image">Image</label>
+        <input type="file" id="imageUpload" name="image" accept="image/*">
+
+        <div>
+          <label for="a"> Target height: <span id="displayTargetH">50</span></label>
+          <input type="range" name="a" id="targetH" min="16" max="256" value="50">
+        </div>
+
+        <div>
+          <label for="b"> Target width: <span id="displayTargetW">50</span></label>
+          <input type="range" name="b" id="targetW" min="16" max="256" value="50">
+        </div>
+        
+        <div>
+          <label for="alpha"> Alphabet: </label>
+          <input type="text" id="alphabet" name="alpha" value=".-!=#$">
+        </div>
+      </div>
+      <div>
+        <pre id="result">
+
+        </pre>
+      </div>
+    </div>
+
+    <script>
+      const inputs = ["imageUpload", "targetH", "targetW", "alphabet"];
+      let is_requesting = false;
+      let selectedFile = null;
+      inputs.forEach(id => {
+        document.getElementById(id).addEventListener("input", update);
+      });
+
+      document.getElementById("imageUpload").addEventListener("change", (e) => {
+        console.log("new file");
+        selectedFile = e.target.files[0];
+      });
+      let timeout = null;
+
+      async function update() {
+        clearTimeout(timeout);
+        const hVal = document.getElementById("targetH").value;
+        const wVal = document.getElementById("targetW").value;
+        const alphabet = document.getElementById("alphabet").value;
+        
+        // Update labels
+        document.getElementById("displayTargetH").textContent = hVal;
+        document.getElementById("displayTargetW").textContent = wVal;
+
+        timeout = setTimeout(async () => {
+          // 2. Get the FRESH file reference from the input directly
+          const fileInput = document.getElementById("imageUpload");
+          const file = fileInput.files[0];
+
+          if (!file) return;
+
+          const formData = new FormData();
+          formData.append("image", file);
+          formData.append("targetH", hVal);
+          formData.append("targetW", wVal);
+          formData.append("alphabet", alphabet);
+
+          try {
+            const res = await fetch("/api/process", {
+              method: "POST",
+              body: formData,
+            });
+            
+            if (!res.ok) throw new Error("Server error");
+            const data = await res.json();
+            console.log("Success:", data);
+            document.getElementById("result").innerHTML = data.str;
+          } catch (e) {
+            // If you STILL get ERR_UPLOAD_FILE_CHANGED, the file on disk is definitely changing
+            console.error("Fetch failed:", e);
+          }
+        }, 300);
+      }
+    </script>
+  </body>
+</html>

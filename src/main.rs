@@ -1,25 +1,29 @@
 use std::io::Cursor;
-use axum::{response::Redirect, routing::{Router, get, post}};
-use axum::response::{Html};
+use axum::{routing::{Router, get, post}};
+use axum::response::{Html, Json};
 use axum::extract::{
     Multipart
 };
-use image::{DynamicImage, GenericImageView, ImageReader, save_buffer};
+use image::{DynamicImage, ImageReader};
 use log::{info, error};
+use serde::Serialize;
+
+#[derive(Serialize)]
+struct Response{
+    str: String
+}
 
 async fn index() -> Html<String>{
     info!("Serve index page");
-    Html(include_str!("../hello.html").to_string())
+    Html(include_str!("../index.html").to_string())
 }
 
 fn image_work(img : DynamicImage, target_h : u32, target_w : u32, alphabet : String) -> Vec<char> {
     info!("Target image sizes: {} {} {}", target_h, target_w, alphabet);
-    let resized_img = img.resize(target_h, target_w, image::imageops::FilterType::Lanczos3);
-    let (width, height) = resized_img.dimensions();
+    let resized_img = img.resize_exact(target_w, target_h, image::imageops::FilterType::Lanczos3);
 
     let bytes = resized_img.into_luma8();
     let raw_bytes = bytes.into_raw();
-    let _ = save_buffer("web_path.png", &raw_bytes, width, height, image::ExtendedColorType::L8);
     info!("Size {}", raw_bytes.len());
     let block_size = 255 / alphabet.len() + 1;
     let mut buffer = vec!['?'; raw_bytes.len()];
@@ -29,15 +33,11 @@ fn image_work(img : DynamicImage, target_h : u32, target_w : u32, alphabet : Str
             Some(x) => x,
             None => '_'
         };
-        print!("{}", buffer[i]);
-        if (i + 1) % (width as usize) == 0 {
-            print!("\n");
-        }
     }
     return buffer;
 }
 
-async fn upload(mut multipart: Multipart) -> Html<String>{
+async fn process_request(mut multipart: Multipart) -> Json<Response>{
     let mut target_h: Option<u32> = None;
     let mut target_w: Option<u32> = None;
     let mut image: Option<DynamicImage> = None;
@@ -69,13 +69,14 @@ async fn upload(mut multipart: Multipart) -> Html<String>{
                             Ok(decoded) => decoded,
                             Err(e) => {
                                 error!("Error: {}", e);
-                                return Html("<h1> Error! </h1>".to_string());
+                                return Json(Response { str: "Meower".to_string() });
                             }
                         }
                     ,
                     Err(e) => {
                         error!("Error: {}", e);
-                        return Html("<h1> Error! </h1>".to_string());
+                        return Json(Response { str: "Error".to_string() })
+                        // return Html("<h1> Error! </h1>".to_string());
                     }
                 };
                 image = Some(img);
@@ -94,12 +95,11 @@ async fn upload(mut multipart: Multipart) -> Html<String>{
                 output.push_str("<br>");
             }
         }
-        Html(format!("<div><h1> Success! </h1> <pre>{:} </pre></div>", output))
+        return Json(Response { str: output });
     }
     else{
-        Html("<h1> Missing fields! </h1>".to_string())
+        return Json(Response { str: "Missing fields".to_string() });
     }
-    
 }
 
 #[tokio::main]
@@ -108,7 +108,7 @@ async fn main(){
 
     let app = Router::new()
     .route("/", get(index))
-    .route("/upload", post(upload));
+    .route("/api/process", post(process_request));
     let address = "127.0.0.1:8080";
 
     info!("Starting the server at http://{}", address);
