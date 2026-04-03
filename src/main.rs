@@ -29,12 +29,9 @@ fn image_work(img : DynamicImage, target_h : u32, target_w : u32, alphabet : Str
     let mut buffer = vec!['?'; raw_bytes.len()];
     for (i, pixel) in raw_bytes.iter().enumerate() {
         let index = pixel / (block_size as u8);
-        buffer[i] = match alphabet.chars().nth(index as usize) {
-            Some(x) => x,
-            None => '_'
-        };
+        buffer[i] = alphabet.chars().nth(index as usize).unwrap_or('_');
     }
-    return buffer;
+    buffer
 }
 
 async fn process_request(mut multipart: Multipart) -> Json<Response>{
@@ -95,10 +92,10 @@ async fn process_request(mut multipart: Multipart) -> Json<Response>{
                 output.push_str("<br>");
             }
         }
-        return Json(Response { str: output });
+        Json(Response { str: output })
     }
     else{
-        return Json(Response { str: "Missing fields".to_string() });
+        Json(Response { str: "Missing fields".to_string() })
     }
 }
 
